@@ -1,0 +1,51 @@
+# Surveillance du stock de la Switch 2 Édition 40e anniversaire Zelda (projet PERSO).
+# Toutes les 10 min : revendeurs. Chaque matin : actus + point quotidien.
+# Repo public = minutes GitHub Actions gratuites et illimitées. Aucun secret dans le code :
+# le webhook Discord vit dans le secret DISCORD_WEBHOOK_STOCK.
+name: watch
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # stock
+    - cron: "0 5 * * *"     # point du matin : 7h Paris jusqu'au 25/10, 6h ensuite
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "stock, news ou test"
+        default: stock
+
+permissions:
+  contents: write  # pour enregistrer l'état (state-*.json)
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Choisir le mode
+        id: m
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT";
+          elif [ "${{ github.event.schedule }}" = "0 5 * * *" ]; then echo "mode=news" >> "$GITHUB_OUTPUT";
+          else echo "mode=stock" >> "$GITHUB_OUTPUT"; fi
+      - name: Lancer
+        env:
+          DISCORD_WEBHOOK_STOCK: ${{ secrets.DISCORD_WEBHOOK_STOCK }}
+        run: node watch.mjs ${{ steps.m.outputs.mode }}
+      - name: Enregistrer l'état
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state-*.json 2>/dev/null || true
+          git diff --cached --quiet && exit 0
+          git commit -m "état ${{ steps.m.outputs.mode }}"
+          git pull --rebase -q && git push -q
