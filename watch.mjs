@@ -29,7 +29,7 @@ const AVEUGLE_MAX = 6; // 6 passages sans rien pouvoir lire (environ 1 h) -> on 
 const args = process.argv.slice(2);
 const mode = args[0];
 const dry = args.includes("--dry");
-const webhook = process.env.DISCORD_WEBHOOK_STOCK;
+const webhook = process.env.DISCORD_WEBHOOK_STOCK?.trim();
 
 const loadJson = async (f, def) => { try { return JSON.parse(await readFile(f, "utf8")); } catch { return def; } };
 const saveJson = (f, o) => writeFile(f, JSON.stringify(o, null, 2) + "\n");
