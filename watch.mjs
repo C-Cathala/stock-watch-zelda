@@ -36,8 +36,17 @@ const saveJson = (f, o) => writeFile(f, JSON.stringify(o, null, 2) + "\n");
 const nowParis = () => new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Paris" }).format(new Date());
 const prix = (s) => { const m = s?.match(/(\d[\d\s  ]*,\d{2})\s*€/); return m ? Number(m[1].replace(/[\s  ]/g, "").replace(",", ".")) : null; };
 
+const HEADERS = {
+  "User-Agent": UA,
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Upgrade-Insecure-Requests": "1",
+  "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Site": "none", "Sec-Fetch-User": "?1",
+  "sec-ch-ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"', "sec-ch-ua-mobile": "?0", "sec-ch-ua-platform": '"Windows"',
+};
+
 async function get(url) {
-  const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "fr-FR,fr;q=0.9" }, redirect: "follow", signal: AbortSignal.timeout(25000) });
+  const r = await fetch(url, { headers: HEADERS, redirect: "follow", signal: AbortSignal.timeout(25000) });
   return { status: r.status, text: await r.text() };
 }
 
@@ -82,7 +91,12 @@ const DIRECTS = [
 ];
 
 async function lireDirect(src) {
-  const { status, text } = await get(src.url);
+  let { status, text } = await get(src.url);
+  // Amazon sert parfois un captcha aux serveurs : on retente 2 fois après une courte pause.
+  for (let i = 0; src.amazon && i < 2 && /validateCaptcha|Saisissez les caractères|Geben Sie die Zeichen/i.test(text); i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    ({ status, text } = await get(src.url));
+  }
   if (status !== 200) return { ok: false, raison: `HTTP ${status}` };
   if (src.amazon) {
     if (/validateCaptcha|Saisissez les caractères|Geben Sie die Zeichen/i.test(text)) return { ok: false, raison: "captcha" };
