@@ -2,12 +2,16 @@
 // Zéro IA, zéro dépendance. Alerte sur Discord via un webhook (secret DISCORD_WEBHOOK_STOCK).
 //
 // Usage :
-//   node watch.mjs stock [--dry]   vérifie les revendeurs (toutes les 10 min)
-//   node watch.mjs news  [--dry]   scanne les actus du jour (chaque matin)
+//   node watch.mjs tick  [--dry]   un passage de la boucle : stock + point du matin s'il est dû
+//   node watch.mjs stock [--dry]   vérifie les revendeurs
+//   node watch.mjs news  [--dry]   scanne les actus du jour (point du matin)
 //   node watch.mjs test            envoie un message de test sur Discord
 //
+// Le workflow tourne en boucle (un passage toutes les 3 min, job de ~5 h 45 relancé en continu) :
+// les crons GitHub seuls ne tournaient qu'une fois toutes les 3 à 5 h au lieu de toutes les 10 min.
+//
 // Sources du mode stock :
-//   1. En direct, toutes les 10 min : Amazon FR, Amazon DE, E.Leclerc, Carrefour, Auchan.
+//   1. En direct, à chaque passage : Amazon FR, Amazon DE, E.Leclerc, Carrefour, Auchan.
 //   2. Alert&Go, une fois par heure : page qui suit 11 revendeurs, mise à jour environ une fois
 //      par jour. Elle couvre ceux qui bloquent les robots (Fnac, Cdiscount, Micromania, Cultura,
 //      Boulanger, JoyBuy).
@@ -24,7 +28,9 @@ const NEWS = ['"Switch 2" Zelda stock', '"Switch 2" Zelda réassort', '"Switch 2
 const MOTS_STOCK = /(r[ée]assort|stock|\bdrop\b|pr[ée]commande|disponible|rupture|restock)/i;
 const REVENDEURS = ["Amazon DE", "Amazon", "Fnac", "E.Leclerc", "Cdiscount", "Carrefour", "Cultura", "Auchan", "Micromania", "Boulanger", "JoyBuy"];
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
-const AVEUGLE_MAX = 6; // 6 passages sans rien pouvoir lire (environ 1 h) -> on prévient
+const AVEUGLE_MAX = 20; // 20 passages sans rien pouvoir lire (environ 1 h à 3 min) -> on prévient
+const AG_TOUTES_LES = 55 * 60e3; // Alert&Go : une lecture par heure, au temps écoulé
+const HEURE_POINT = 7; // point du matin, heure de Paris
 
 const args = process.argv.slice(2);
 const mode = args[0];
@@ -90,6 +96,9 @@ const DIRECTS = [
     valide: /<title>[^<]*Zelda/i, rupture: /"price":\s*null/ },
 ];
 
+// Revendeur Alert&Go -> source directe équivalente.
+const AG_DIRECT = { Amazon: "amazon-fr", "Amazon DE": "amazon-de", "E.Leclerc": "leclerc", Carrefour: "carrefour", Auchan: "auchan" };
+
 async function lireDirect(src) {
   let { status, text } = await get(src.url);
   // Amazon sert parfois un captcha aux serveurs : on retente 2 fois après une courte pause.
@@ -119,8 +128,10 @@ async function lireDirect(src) {
 async function modeStock() {
   const st = await loadJson("state-stock.json", {});
   st.dispo ??= {}; st.dernierOk ??= {}; st.aveugle ??= 0;
-  // Alert&Go ne change qu'une fois par jour : on le lit une fois par heure, pas toutes les 10 min.
-  const lireAg = args.includes("--all") || new Date().getUTCMinutes() < 10 || !st.dernierOk.alertetgo;
+  // Alert&Go ne change qu'une fois par jour : on le lit une fois par heure. Calcul au temps écoulé
+  // depuis le dernier essai (l'ancien test « minute < 10 » ratait presque toujours avec des crons en retard).
+  const lireAg = args.includes("--all") || !st.essaiAlertetgo || Date.now() - Date.parse(st.essaiAlertetgo) > AG_TOUTES_LES;
+  if (lireAg) st.essaiAlertetgo = new Date().toISOString();
   const resultats = await Promise.all(DIRECTS.map((s) => lireDirect(s).catch((e) => ({ ok: false, raison: e.message }))));
   const ag = lireAg ? await lireAlertetgo().catch((e) => ({ ok: false, raison: e.message })) : null;
 
@@ -138,6 +149,10 @@ async function modeStock() {
       st.dernierOk.alertetgo = new Date().toISOString();
       st.majAlertetgo = ag.maj;
       for (const [rev, e] of Object.entries(ag.etats)) {
+        // Alert&Go n'est mis à jour qu'une fois par jour : si on lit la fiche du magasin en direct
+        // à ce passage, c'est elle qui fait foi (évite une alerte sur un stock déjà reparti).
+        const direct = AG_DIRECT[rev];
+        if (direct && direct in actuel) { actuel[`ag:${rev}`] = null; continue; }
         actuel[`ag:${rev}`] = e.dispo && (e.prix === null || e.prix <= PRIX_MAX) ? { nom: `${rev} (via Alert&Go)`, url: ALERTETGO, prix: e.prix } : null;
       }
     }
@@ -215,7 +230,27 @@ async function modeNews() {
   await saveJson("state-news.json", st);
 }
 
-if (mode === "stock") await modeStock();
+// Date et heure de Paris, pour déclencher le point du matin une seule fois par jour.
+const paris = () => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+    .formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return { jour: `${p.year}-${p.month}-${p.day}`, heure: Number(p.hour) };
+};
+
+async function modeTick() {
+  await modeStock();
+  const { jour, heure } = paris();
+  const news = await loadJson("state-news.json", {});
+  if (heure >= HEURE_POINT && news.dernierPoint !== jour) {
+    await modeNews();
+    const st = await loadJson("state-news.json", {});
+    st.dernierPoint = jour;
+    await saveJson("state-news.json", st);
+  }
+}
+
+if (mode === "tick") await modeTick();
+else if (mode === "stock") await modeStock();
 else if (mode === "news") await modeNews();
 else if (mode === "test") await discord("Test : la surveillance du stock Zelda est branchée. Tu recevras un @everyone ici dès qu'un revendeur a la console.", null);
 else { console.error("Mode attendu : stock | news | test"); process.exit(2); }

@@ -1,18 +1,19 @@
 # Surveillance du stock de la Switch 2 Édition 40e anniversaire Zelda (projet PERSO).
-# Toutes les 10 min : revendeurs. Chaque matin : actus + point quotidien.
+# Un job tourne en boucle ~5 h 45 : revendeurs toutes les 3 min, point du matin à 7 h (Paris).
+# Les crons GitHub ne servent qu'à relancer la boucle : seuls, ils ne tournaient qu'une fois
+# toutes les 3 à 5 h. Un nouveau job attend en file (concurrency) et prend le relais aussitôt.
 # Repo public = minutes GitHub Actions gratuites et illimitées. Aucun secret dans le code :
 # le webhook Discord vit dans le secret DISCORD_WEBHOOK_STOCK.
 name: watch
 
 on:
   schedule:
-    - cron: "*/10 * * * *"  # stock
-    - cron: "0 5 * * *"     # point du matin : 7h Paris jusqu'au 25/10, 6h ensuite
+    - cron: "*/20 * * * *"  # relance de la boucle (les déclenchements en trop restent en file)
   workflow_dispatch:
     inputs:
       mode:
-        description: "stock, news ou test"
-        default: stock
+        description: "boucle, stock, news ou test"
+        default: boucle
 
 permissions:
   contents: write  # pour enregistrer l'état (state-*.json)
@@ -24,28 +25,32 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Choisir le mode
-        id: m
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT";
-          elif [ "${{ github.event.schedule }}" = "0 5 * * *" ]; then echo "mode=news" >> "$GITHUB_OUTPUT";
-          else echo "mode=stock" >> "$GITHUB_OUTPUT"; fi
-      - name: Lancer
-        env:
-          DISCORD_WEBHOOK_STOCK: ${{ secrets.DISCORD_WEBHOOK_STOCK }}
-        run: node watch.mjs ${{ steps.m.outputs.mode }}
-      - name: Enregistrer l'état
-        if: always()
+      - name: Identité git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add state-*.json 2>/dev/null || true
-          git diff --cached --quiet && exit 0
-          git commit -m "état ${{ steps.m.outputs.mode }}"
-          git pull --rebase -q && git push -q
+      - name: Lancer
+        env:
+          DISCORD_WEBHOOK_STOCK: ${{ secrets.DISCORD_WEBHOOK_STOCK }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'boucle' }}
+        run: |
+          # Enregistre l'état (state-*.json) dans le repo : il survit d'un job à l'autre.
+          save() {
+            git add state-*.json 2>/dev/null || true
+            git diff --cached --quiet && return 0
+            git commit -qm "état $1"
+            git pull --rebase -q && git push -q || echo "push raté, nouvel essai au prochain passage"
+          }
+          if [ "$MODE" != "boucle" ]; then node watch.mjs "$MODE"; save "$MODE"; exit 0; fi
+          fin=$((SECONDS + 345 * 60))
+          while [ $SECONDS -lt $fin ]; do
+            node watch.mjs tick || echo "passage en erreur, on continue"
+            save tick
+            sleep 180
+          done
