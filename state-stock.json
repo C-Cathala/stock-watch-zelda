@@ -11,7 +11,7 @@
     "ag:Carrefour": false,
     "ag:Cultura": false,
     "ag:Auchan": false,
-    "ag:Micromania": false,
+    "ag:Micromania": true,
     "ag:Boulanger": false,
     "ag:JoyBuy": false,
     "ag:Amazon DE": false
@@ -19,12 +19,12 @@
   "dernierOk": {
     "amazon-fr": "2026-10-09T18:21:53.311Z",
     "amazon-de": "2026-10-09T17:41:05.573Z",
-    "leclerc": "2026-10-09T18:28:12.319Z",
-    "auchan": "2026-10-09T18:28:12.320Z",
-    "alertetgo": "2026-10-09T18:25:03.975Z"
+    "leclerc": "2026-10-10T00:17:52.844Z",
+    "auchan": "2026-10-10T00:17:52.844Z",
+    "alertetgo": "2026-10-10T00:17:52.844Z"
   },
   "aveugle": 0,
-  "majAlertetgo": "09/10/2026 18:04",
-  "dernierPassage": "2026-10-09",
-  "essaiAlertetgo": "2026-10-09T18:24:54.664Z"
+  "majAlertetgo": "09/10/2026 20:29",
+  "dernierPassage": "2026-10-10",
+  "essaiAlertetgo": "2026-10-10T00:17:44.105Z"
 }
