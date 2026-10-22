@@ -17,13 +17,13 @@
     "ag:Amazon DE": false
   },
   "dernierOk": {
-    "amazon-fr": "2026-10-22T13:34:28.302Z",
+    "amazon-fr": "2026-10-22T19:30:15.585Z",
     "amazon-de": "2026-10-22T11:53:58.462Z",
     "leclerc": "2026-10-22T13:37:36.290Z",
     "auchan": "2026-10-22T13:37:36.290Z",
     "alertetgo": "2026-10-22T19:27:06.164Z"
   },
-  "aveugle": 1,
+  "aveugle": 0,
   "majAlertetgo": "22/10/2026 20:29",
   "dernierPassage": "2026-10-22",
   "essaiAlertetgo": "2026-10-22T19:26:57.321Z"
