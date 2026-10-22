@@ -2,7 +2,7 @@
   "dispo": {
     "amazon-fr": false,
     "amazon-de": false,
-    "leclerc": true,
+    "leclerc": false,
     "auchan": false,
     "ag:Amazon": false,
     "ag:Fnac": false,
@@ -19,8 +19,8 @@
   "dernierOk": {
     "amazon-fr": "2026-10-22T09:41:49.040Z",
     "amazon-de": "2026-10-22T11:22:33.051Z",
-    "leclerc": "2026-10-22T11:28:49.661Z",
-    "auchan": "2026-10-22T11:28:49.661Z",
+    "leclerc": "2026-10-22T11:31:57.912Z",
+    "auchan": "2026-10-22T11:31:57.913Z",
     "alertetgo": "2026-10-22T10:44:50.009Z"
   },
   "aveugle": 0,
