@@ -2,7 +2,7 @@
   "dispo": {
     "amazon-fr": false,
     "amazon-de": false,
-    "leclerc": false,
+    "leclerc": true,
     "auchan": false,
     "ag:Amazon": false,
     "ag:Fnac": false,
@@ -17,14 +17,14 @@
     "ag:Amazon DE": false
   },
   "dernierOk": {
-    "amazon-fr": "2026-10-23T06:59:12.915Z",
+    "amazon-fr": "2026-10-23T07:55:52.763Z",
     "amazon-de": "2026-10-23T01:03:29.823Z",
-    "leclerc": "2026-10-23T07:52:41.873Z",
-    "auchan": "2026-10-23T07:52:41.873Z",
-    "alertetgo": "2026-10-23T06:59:12.915Z"
+    "leclerc": "2026-10-23T07:55:52.763Z",
+    "auchan": "2026-10-23T07:55:52.763Z",
+    "alertetgo": "2026-10-23T07:55:52.763Z"
   },
   "aveugle": 0,
   "majAlertetgo": "22/10/2026 20:29",
   "dernierPassage": "2026-10-23",
-  "essaiAlertetgo": "2026-10-23T06:59:03.157Z"
+  "essaiAlertetgo": "2026-10-23T07:55:43.744Z"
 }
